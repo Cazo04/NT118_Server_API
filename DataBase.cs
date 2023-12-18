@@ -223,14 +223,14 @@ namespace NT118_Server_API
                 cmd.ExecuteNonQuery();
             }
         }
-        public void ThemNhanVienVaoCongViec(LichLamViec lich, NhanVien nhanVien)
+        public void ThemNhanVienVaoCongViec(int malv, string manv)
         {
             using (MySqlConnection conn = new MySqlConnection(Server0))
             {
                 string query = "INSERT INTO THAMGIALAMVIEC (MALV, MANV) VALUES (@MaLV, @MaNV)";
                 MySqlCommand cmd = new MySqlCommand(query, conn);
-                cmd.Parameters.AddWithValue("@MaLV", lich.MaLV);
-                cmd.Parameters.AddWithValue("@MaNV", nhanVien.MANV);
+                cmd.Parameters.AddWithValue("@MaLV", malv);
+                cmd.Parameters.AddWithValue("@MaNV", manv);
 
                 conn.Open();
                 cmd.ExecuteNonQuery();
@@ -328,6 +328,44 @@ namespace NT118_Server_API
             }
             return danhSachCongViec;
         }
+        public List<LichLamViec> LayDanhSachCongViecCuaPhongBan(string phBan, int offset = 0)
+        {
+            List<LichLamViec> danhSachCongViec = new List<LichLamViec>();
+            using (MySqlConnection conn = new MySqlConnection(Server0))
+            {
+                string query = @"
+            SELECT *
+            FROM LICHLAMVIEC
+            WHERE PHBAN = @PhBan
+            LIMIT 10 OFFSET @Offset";
+                MySqlCommand cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@PhBan", phBan);
+                cmd.Parameters.AddWithValue("@Offset", offset);
+
+                conn.Open();
+                using (MySqlDataReader reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        LichLamViec lichLamViec = new LichLamViec
+                        {
+                            // Điền thông tin của lịch làm việc từ reader
+                            // Ví dụ:
+                            MaLV = reader.GetInt32(reader.GetOrdinal("MALV")),
+                            TieuDe = reader.IsDBNull(reader.GetOrdinal("TIEUDE")) ? null : reader.GetString(reader.GetOrdinal("TIEUDE")),
+                            MoTa = reader.IsDBNull(reader.GetOrdinal("MOTA")) ? null : reader.GetString(reader.GetOrdinal("MOTA")),
+                            NgayBatDau = reader.GetDateTime(reader.GetOrdinal("NGAYBATDAU")),
+                            NgayKetThuc = reader.GetDateTime(reader.GetOrdinal("NGAYKETTHUC")),
+                            PhBan = reader.GetString(reader.GetOrdinal("PHBAN")),
+                            SoLuongNhanVien = reader.GetInt32(reader.GetOrdinal("SoLuongNhanVien"))
+                        };
+                        danhSachCongViec.Add(lichLamViec);
+                    }
+                }
+            }
+            return danhSachCongViec;
+        }
+
         #endregion
         #region Tin nhắn
         public void ThemTinNhanThuong(TinNhan tin)
@@ -785,17 +823,25 @@ namespace NT118_Server_API
             }
             return null;
         }
-        public bool CheckIfTRPHExists(string trph)
+        public string? CheckIfTRPHExists(string trph)
         {
             using (var connection = new MySqlConnection(Server0))
             {
                 connection.Open();
-                var query = "SELECT COUNT(*) FROM PHONGBAN WHERE TRPH = @trph";
+                string query = @"
+                    SELECT PHONGBAN.MAPH
+                    FROM PHONGBAN
+                    WHERE PHONGBAN.TRPH = @manv";
                 using (var cmd = new MySqlCommand(query, connection))
                 {
-                    cmd.Parameters.AddWithValue("@trph", trph);
-                    int count = Convert.ToInt32(cmd.ExecuteScalar());
-                    return count > 0;
+                    cmd.Parameters.AddWithValue("@manv", trph);
+                    object result = cmd.ExecuteScalar();
+
+                    if (result != null)
+                    {
+                        return result.ToString();
+                    }
+                    else return null;
                 }
             }
         }
@@ -939,13 +985,18 @@ namespace NT118_Server_API
                 }
             }
         }
-        public List<NhanVien>? GetNhanViens(Admin admin, NhanVien nhanVien)
+        public List<NhanVien>? GetNhanViens(Admin admin, NhanVien nhanVien, NhanVien? trph = null)
         {
-            bool? checking = AdminLogin(admin);
-            if (checking == null || checking == false)
+            if (trph == null)
             {
-                return null;
+                bool? checking = AdminLogin(admin);
+                if (checking == null || checking == false)
+                {
+                    return null;
+                }
             }
+
+
             StringBuilder queryBuilder = new StringBuilder("SELECT ");
             var checker = nhanVien.Check;
             var fields = new List<string>();

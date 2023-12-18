@@ -8,5 +8,6 @@
         public DateTime? NgayBatDau { get; set; }
         public DateTime? NgayKetThuc { get; set; }
         public string? PhBan { get; set; }
+        public int? SoLuongNhanVien { get; set; }
     }
 }

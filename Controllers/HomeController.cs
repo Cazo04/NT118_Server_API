@@ -40,9 +40,10 @@ namespace NT118_Server_API.Controllers
         public async Task<IActionResult> CheckTRPH([FromBody] string manv)
         {
             DataBase data = new DataBase();
-            if (data.CheckIfTRPHExists(manv))
+            string? checker = data.CheckIfTRPHExists(manv);
+            if (checker != null)
             {
-                return Ok();
+                return Ok(checker);
             } else return NoContent();
         }
         [HttpGet]

@@ -16,14 +16,14 @@ namespace NT118_Server_API.Controllers
         {
             DataBase db = new DataBase();
             if (db.Login(trph.MANV, trph.MK) != true) return false;
-            if (!db.CheckIfTRPHExists(trph.MANV)) return false;
+            if (db.CheckIfTRPHExists(trph.MANV) == null) return false;
             if (maph != null)
             {
                 NhanVien? nhanVien = db.GetPHBanFromNhanVien(trph.MANV);
                 if (nhanVien != null && nhanVien.PHBAN == maph) return true;
                 else return false;
             }
-            return false;
+            return true;
         }
         [HttpPost]
         [Route("ThemCongViec")]
@@ -63,12 +63,12 @@ namespace NT118_Server_API.Controllers
         }
         [HttpPost]
         [Route("ThemNhanVienVaoCongViec")]
-        public async Task<IActionResult> ThemNhanVienVaoCongViec(KeyValuePair<NhanVien,KeyValuePair<LichLamViec,NhanVien>> data)
+        public async Task<IActionResult> ThemNhanVienVaoCongViec(KeyValuePair<NhanVien, ThamGiaLamViec> data)
         {
             DataBase db = new DataBase();
-            if (Authentication(data.Key, data.Value.Key.PhBan))
+            if (Authentication(data.Key, data.Key.MANV))
             {
-                db.ThemNhanVienVaoCongViec(data.Value.Key, data.Value.Value);
+                db.ThemNhanVienVaoCongViec(data.Value.MALV, data.Value.MANV);
                 return Ok();
             }
             return BadRequest("Authentication failed");
@@ -118,6 +118,27 @@ namespace NT118_Server_API.Controllers
             }
             return BadRequest("Authentication failed");
         }
-
+        [HttpPost]
+        [Route("LayDanhSachCongViecCuaPhongBan_Limit10")]
+        public async Task<IActionResult> LayDanhSachCongViecCuaPhongBan_Limit10(KeyValuePair<NhanVien, LichLamViec> data)
+        {
+            DataBase db = new DataBase();
+            if (Authentication(data.Key, data.Value.PhBan))
+            {
+                return Ok(db.LayDanhSachCongViecCuaPhongBan(data.Value.PhBan,(int) data.Value.MaLV));
+            }
+            return BadRequest("Authentication failed");
+        }
+        [HttpPost]
+        [Route("GetNhanViens")]
+        public async Task<IActionResult> GetNhanViens(KeyValuePair<NhanVien, NhanVien> data)
+        {
+            DataBase db = new DataBase();
+            if (Authentication(data.Key, data.Key.PHBAN))
+            {
+                return Ok(db.GetNhanViens(new Admin(), data.Value, data.Key));
+            }
+            return BadRequest("Authentication failed");
+        }
     }
 }
