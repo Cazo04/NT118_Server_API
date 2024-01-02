@@ -12,6 +12,12 @@ namespace NT118_Server_API.Controllers
         {
             _logger = logger;
         }
+        private bool Authentication(NhanVien nhanVien)
+        {
+            DataBase db = new DataBase();
+            if (db.Login(nhanVien.MANV, nhanVien.MK) != true) return false;
+            return true;
+        }
         [HttpPost]
         [Route("Login")]
         public async Task<IActionResult> Login(NhanVien nhanVien)
@@ -52,6 +58,33 @@ namespace NT118_Server_API.Controllers
         {
             DataBase data = new DataBase();
             return Ok(data.TestConnection(id));
+        }
+        [HttpPost]
+        [Route("InsertNgNhanTB")]
+        public async Task<IActionResult> InsertNgNhanTB(KeyValuePair<NhanVien, NotificationManagerData> data)
+        {
+            DataBase db = new DataBase();
+            if (Authentication(data.Key))
+            {
+                int id = (data.Value.ID == null ? 0 : (int)data.Value.ID);
+                db.InsertNgNhanTB(id, data.Key.MANV);
+                return Ok();
+            }
+            return BadRequest("Authentication failed");
+        }
+        [HttpPost]
+        [Route("InsertNgXemTB")]
+        public async Task<IActionResult> InsertNgXemTB(KeyValuePair<NhanVien, NotificationManagerData> data)
+        {
+            DataBase db = new DataBase();
+            if (Authentication(data.Key))
+            {
+                int id = (data.Value.ID == null ? 0 : (int)data.Value.ID);
+
+                db.InsertNgXemTB(id, data.Key.MANV);
+                return Ok();
+            }
+            return BadRequest("Authentication failed");
         }
     }
 }

@@ -136,5 +136,22 @@ namespace NT118_Server_API.Controllers
             }
             return Ok(file.Length);
         }
+        private bool Authentication(NhanVien nhanVien)
+        {
+            DataBase db = new DataBase();
+            if (db.Login(nhanVien.MANV, nhanVien.MK) != true) return false;
+            return true;
+        }
+        [HttpPost]
+        [Route("GetNotificationsForEmployee")]
+        public async Task<IActionResult> GetNotificationsForEmployee(NhanVien trph)
+        {
+            DataBase db = new DataBase();
+            if (Authentication(trph))
+            {
+                return Ok(db.GetNotificationsForEmployee(trph.MANV));
+            }
+            return BadRequest("Authentication failed");
+        }
     }
 }

@@ -236,14 +236,14 @@ namespace NT118_Server_API
                 cmd.ExecuteNonQuery();
             }
         }
-        public void XoaNhanVienKhoiCongViec(LichLamViec lich, NhanVien nhanVien)
+        public void XoaNhanVienKhoiCongViec(int malv, string manv)
         {
             using (MySqlConnection conn = new MySqlConnection(Server0))
             {
                 string query = "DELETE FROM THAMGIALAMVIEC WHERE MALV = @MaLV AND MANV = @MaNV";
                 MySqlCommand cmd = new MySqlCommand(query, conn);
-                cmd.Parameters.AddWithValue("@MaLV", lich.MaLV);
-                cmd.Parameters.AddWithValue("@MaNV", nhanVien.MANV);
+                cmd.Parameters.AddWithValue("@MaLV", malv);
+                cmd.Parameters.AddWithValue("@MaNV", manv);
 
                 conn.Open();
                 cmd.ExecuteNonQuery();
@@ -510,6 +510,246 @@ namespace NT118_Server_API
 
 
 
+        #endregion
+        #region Thông báo
+        public void InsertNotification(NotificationManagerData data, string nggui)
+        {
+            if ((data.Phban != null && data.Ngnhan != null) || (data.Phban == null && data.Ngnhan == null))
+            {
+                throw new ArgumentException("Chỉ một trong hai trường Phban hoặc Ngnhan được phép khác null.");
+            }
+
+            try
+            {
+                using (MySqlConnection connection = new MySqlConnection(Server0))
+                {
+                    connection.Open();
+
+                    string sql = "INSERT INTO THONGBAO (NGGUI, PHBAN, NGNHAN, ND, TG) VALUES (@Nggui, @Phban, @Ngnhan, @Content, @Date)";
+
+                    using (MySqlCommand command = new MySqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@Nggui", nggui);
+                        command.Parameters.AddWithValue("@Phban", data.Phban ?? (object)DBNull.Value);
+                        command.Parameters.AddWithValue("@Ngnhan", data.Ngnhan ?? (object)DBNull.Value);
+                        command.Parameters.AddWithValue("@Content", data.Content);
+                        command.Parameters.AddWithValue("@Date", DateTime.Now);
+
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Error during database operation: " + ex.Message, ex);
+            }
+        }
+        public List<NotificationManagerData> GetNotificationsForEmployee(string MANV)
+        {
+            List<NotificationManagerData> notifications = new List<NotificationManagerData>();
+
+            try
+            {
+                using (MySqlConnection connection = new MySqlConnection(Server0))
+                {
+                    connection.Open();
+
+                    // Kiểm tra vai trò của nhân viên
+                    bool isManager = false;
+                    string checkRoleSql = @"SELECT COUNT(*) FROM PHONGBAN WHERE TRPH = @MANV";
+                    using (MySqlCommand checkRoleCmd = new MySqlCommand(checkRoleSql, connection))
+                    {
+                        checkRoleCmd.Parameters.AddWithValue("@MANV", MANV);
+                        isManager = Convert.ToInt32(checkRoleCmd.ExecuteScalar()) > 0;
+                    }
+
+                    // Chọn truy vấn dựa trên vai trò
+                    string sql;
+                    if (isManager)
+                    {
+                        // Nhân viên là trưởng phòng
+                        sql = @"SELECT * FROM THONGBAO 
+                            WHERE NGGUI = @MANV 
+                            AND TG BETWEEN DATE_SUB(NOW(), INTERVAL 1 WEEK) AND NOW()";
+                    }
+                    else
+                    {
+                        // Nhân viên không phải là trưởng phòng
+                        sql = @"SELECT * FROM THONGBAO 
+                            WHERE PHBAN = (SELECT PHBAN FROM NHANVIEN WHERE MANV = @MANV)
+                            AND TG BETWEEN DATE_SUB(NOW(), INTERVAL 1 WEEK) AND NOW()";
+                    }
+
+                    using (MySqlCommand command = new MySqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@MANV", MANV);
+                        using (MySqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                NotificationManagerData data = new NotificationManagerData
+                                {
+                                    ID = reader.GetInt32("ID"),
+                                    Phban = reader.IsDBNull(reader.GetOrdinal("PHBAN")) ? null : reader.GetString("PHBAN"),
+                                    Date = reader.GetDateTime("TG").ToString("dd/MM/yyyy HH:mm"),
+                                    Content = reader.GetString("ND"),
+                                    Received = reader.IsDBNull(reader.GetOrdinal("SONGNHAN")) ? null : reader.GetInt32("SONGNHAN"),
+                                    Seen = reader.IsDBNull(reader.GetOrdinal("SONGXEM")) ? null : reader.GetInt32("SONGXEM"),
+                                    IsSeen = HasEmployeeSeenNotification(MANV, reader.GetInt32("ID"))
+                                };
+                                notifications.Add(data);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Xử lý lỗi
+                throw new Exception("Error: " + ex.Message);
+            }
+
+            return notifications;
+        }
+        public void InsertNgNhanTB(int matb, string manv)
+        {
+            try
+            {
+                using (MySqlConnection connection = new MySqlConnection(Server0))
+                {
+                    connection.Open();
+
+                    string sql = "INSERT INTO NGNHANTB (MATB, MANV) VALUES (@Matb, @Manv)";
+
+                    using (MySqlCommand command = new MySqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@Matb", matb);
+                        command.Parameters.AddWithValue("@Manv", manv);
+
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Xử lý lỗi
+                //throw new Exception("Error: " + ex.Message);
+            }
+        }
+        public void DeleteNotification(int id)
+        {
+            try
+            {
+                using (MySqlConnection connection = new MySqlConnection(Server0))
+                {
+                    connection.Open();
+
+                    string sql = "DELETE FROM THONGBAO WHERE ID = @Id";
+
+                    using (MySqlCommand command = new MySqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@Id", id);
+
+                        int affectedRows = command.ExecuteNonQuery();
+                        if (affectedRows == 0)
+                        {
+                            //throw new Exception("Không có thông báo nào được xóa.");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Error: " + ex.Message);
+            }
+        }
+        public void InsertNgXemTB(int matb, string manv)
+        {
+            try
+            {
+                using (MySqlConnection connection = new MySqlConnection(Server0))
+                {
+                    connection.Open();
+
+                    string sql = "INSERT INTO NGXEMTB (MATB, MANV) VALUES (@Matb, @Manv)";
+
+                    using (MySqlCommand command = new MySqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@Matb", matb);
+                        command.Parameters.AddWithValue("@Manv", manv);
+
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Xử lý lỗi
+                //throw new Exception("Error: " + ex.Message);
+            }
+        }
+        public bool HasEmployeeSeenNotification(string manv, int matb)
+        {
+            try
+            {
+                using (MySqlConnection connection = new MySqlConnection(Server0))
+                {
+                    connection.Open();
+
+                    string sql = "SELECT COUNT(*) FROM NGXEMTB WHERE MANV = @Manv AND MATB = @Matb";
+
+                    using (MySqlCommand command = new MySqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@Manv", manv);
+                        command.Parameters.AddWithValue("@Matb", matb);
+
+                        int count = Convert.ToInt32(command.ExecuteScalar());
+                        return count > 0;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Xử lý lỗi
+                throw new Exception("Error: " + ex.Message);
+            }
+        }
+        #endregion
+        #region Manager Role
+        public NhanVien? GetNhanVienByManager(string manv)
+        {
+            using (var connection = new MySqlConnection(Server0))
+            {
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT * FROM NHANVIEN WHERE MANV = @manv";
+                cmd.Parameters.AddWithValue("@manv", manv);
+
+                connection.Open();
+                using (var reader = cmd.ExecuteReader())
+                {
+                    if (reader.Read())
+                    {
+                        return new NhanVien
+                        {
+                            MANV = reader["MANV"].ToString(),
+                            //MK = reader["MK"].ToString(),
+                            HOTEN = reader["HOTEN"].ToString(),
+                            GIOITINH = reader["GIOITINH"].ToString(),
+                            NGSINH = reader.IsDBNull(reader.GetOrdinal("NGSINH")) ? DateTime.MinValue : reader.GetDateTime(reader.GetOrdinal("NGSINH")),
+                            NGVL = reader.IsDBNull(reader.GetOrdinal("NGVL")) ? DateTime.MinValue : reader.GetDateTime(reader.GetOrdinal("NGVL")),
+                            DC = reader["DC"].ToString(),
+                            SDT = reader["SDT"].ToString(),
+                            EMAIL = reader["EMAIL"].ToString(),
+                            CCCD = reader["CCCD"].ToString(),
+                            LCB = reader.IsDBNull(reader.GetOrdinal("LCB")) ? 0 : reader.GetDecimal(reader.GetOrdinal("LCB")),
+                            PHBAN = reader["PHBAN"].ToString()
+                        };
+                    }
+                }
+            }
+
+            return null;
+        }
         #endregion
         public void InsertNhanVienToPhongBan(Admin admin, PhongBan phongBan)
         {

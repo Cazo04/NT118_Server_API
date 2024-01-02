@@ -66,7 +66,7 @@ namespace NT118_Server_API.Controllers
         public async Task<IActionResult> ThemNhanVienVaoCongViec(KeyValuePair<NhanVien, ThamGiaLamViec> data)
         {
             DataBase db = new DataBase();
-            if (Authentication(data.Key, data.Key.MANV))
+            if (Authentication(data.Key))
             {
                 db.ThemNhanVienVaoCongViec(data.Value.MALV, data.Value.MANV);
                 return Ok();
@@ -75,12 +75,12 @@ namespace NT118_Server_API.Controllers
         }
         [HttpPost]
         [Route("XoaNhanVienKhoiCongViec")]
-        public async Task<IActionResult> XoaNhanVienKhoiCongViec(KeyValuePair<NhanVien,KeyValuePair<LichLamViec,NhanVien>> data)
+        public async Task<IActionResult> XoaNhanVienKhoiCongViec(KeyValuePair<NhanVien,ThamGiaLamViec> data)
         {
             DataBase db = new DataBase();
-            if (Authentication(data.Key, data.Value.Key.PhBan))
+            if (Authentication(data.Key))
             {
-                db.XoaNhanVienKhoiCongViec(data.Value.Key, data.Value.Value);
+                db.XoaNhanVienKhoiCongViec(data.Value.MALV, data.Value.MANV);
                 return Ok();
             }
             return BadRequest("Authentication failed");
@@ -140,5 +140,52 @@ namespace NT118_Server_API.Controllers
             }
             return BadRequest("Authentication failed");
         }
+        [HttpPost]
+        [Route("InsertNotification")]
+        public async Task<IActionResult> InsertNotification(KeyValuePair<NhanVien, NotificationManagerData> data)
+        {
+            DataBase db = new DataBase();
+            if (Authentication(data.Key, data.Value.Phban))
+            {
+                db.InsertNotification(data.Value, data.Key.MANV);
+                return Ok();
+            }
+            return BadRequest("Authentication failed");
+        }
+        [HttpPost]
+        [Route("GetNotificationsForEmployee")]
+        public async Task<IActionResult> GetNotificationsForEmployee(NhanVien trph)
+        {
+            DataBase db = new DataBase();
+            if (Authentication(trph))
+            {
+                return Ok(db.GetNotificationsForEmployee(trph.MANV));
+            }
+            return BadRequest("Authentication failed");
+        }
+        [HttpPost]
+        [Route("DeleteNotification")]
+        public async Task<IActionResult> DeleteNotification(KeyValuePair<NhanVien, NotificationManagerData> data)
+        {
+            DataBase db = new DataBase();
+            if (Authentication(data.Key))
+            {            
+                int id = (data.Value.ID == null ? 0 : (int)data.Value.ID);
+                db.DeleteNotification(id);
+                return Ok();
+            }
+            return BadRequest("Authentication failed");
+        }    
+        [HttpPost]
+        [Route("GetNhanVien")]
+        public async Task<IActionResult> GetNhanVien(KeyValuePair<NhanVien, NhanVien> data)
+        {
+            DataBase db = new DataBase();
+            if (Authentication(data.Key))
+            {                        
+                return Ok(db.GetNhanVienByManager(data.Value.MANV));
+            }
+            return BadRequest("Authentication failed");
+        }    
     }
 }
