@@ -153,5 +153,16 @@ namespace NT118_Server_API.Controllers
             }
             return BadRequest("Authentication failed");
         }
+        [HttpPost]
+        [Route("LayDanhSachCongViecTheoTuan")]
+        public async Task<IActionResult> LayDanhSachCongViecTheoTuan(NhanVien trph)
+        {
+            DataBase db = new DataBase();
+            if (Authentication(trph))
+            {
+                return Ok(db.LayDanhSachCongViecTheoTuan(trph.MANV));
+            }
+            return BadRequest("Authentication failed");
+        }
     }
 }

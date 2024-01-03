@@ -365,6 +365,59 @@ namespace NT118_Server_API
             }
             return danhSachCongViec;
         }
+        public (DateTime, DateTime) LayNgayDauVaCuoiTuan()
+        {
+            DateTime today = DateTime.Today;
+            int daysUntilMonday = (int)DayOfWeek.Monday - (int)today.DayOfWeek;
+            int daysUntilSunday = (int)DayOfWeek.Sunday - (int)today.DayOfWeek;
+
+            DateTime monday = today.AddDays(daysUntilMonday);
+            DateTime sunday = today.AddDays(daysUntilSunday + 7); // Thêm 7 để đảm bảo Chủ nhật của cùng tuần
+
+            return (monday, sunday);
+        }
+        public List<LichLamViec> LayDanhSachCongViecTheoTuan(string manv)
+        {
+            var (monday, sunday) = LayNgayDauVaCuoiTuan();
+            List<LichLamViec> danhSachCongViec = new List<LichLamViec>();
+
+            using (MySqlConnection conn = new MySqlConnection(Server0))
+            {
+                string query = @"
+            SELECT LLV.*
+            FROM LICHLAMVIEC LLV
+            JOIN THAMGIALAMVIEC TGV ON LLV.MALV = TGV.MALV
+            WHERE TGV.MANV = @MANV AND
+                  LLV.NGAYBATDAU >= @NgayBatDau AND
+                  LLV.NGAYKETTHUC <= @NgayKetThuc";
+                MySqlCommand cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@MANV", manv);
+                cmd.Parameters.AddWithValue("@NgayBatDau", monday);
+                cmd.Parameters.AddWithValue("@NgayKetThuc", sunday);
+
+                conn.Open();
+                using (MySqlDataReader reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        LichLamViec lichLamViec = new LichLamViec
+                        {
+                            // Điền thông tin của lịch làm việc từ reader
+                            // Ví dụ:
+                            MaLV = reader.GetInt32(reader.GetOrdinal("MALV")),
+                            TieuDe = reader.IsDBNull(reader.GetOrdinal("TIEUDE")) ? null : reader.GetString(reader.GetOrdinal("TIEUDE")),
+                            MoTa = reader.IsDBNull(reader.GetOrdinal("MOTA")) ? null : reader.GetString(reader.GetOrdinal("MOTA")),
+                            NgayBatDau = reader.GetDateTime(reader.GetOrdinal("NGAYBATDAU")),
+                            NgayKetThuc = reader.GetDateTime(reader.GetOrdinal("NGAYKETTHUC")),
+                            PhBan = reader.GetString(reader.GetOrdinal("PHBAN"))
+                        };
+                        danhSachCongViec.Add(lichLamViec);
+                    }
+                }
+            }
+
+            return danhSachCongViec;
+        }
 
         #endregion
         #region Tin nhắn
